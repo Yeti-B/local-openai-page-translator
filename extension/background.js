@@ -221,9 +221,10 @@ async function sendToActiveTab(message) {
 }
 
 async function sendToTab(tabId, message) {
-  if (!tabId) return;
+  if (!tabId || typeof chrome.tabs?.sendMessage !== "function") return;
   chrome.tabs.sendMessage(tabId, message).catch(async () => {
     try {
+      if (typeof chrome.scripting?.executeScript !== "function") return;
       await chrome.scripting.executeScript({
         target: { tabId },
         files: ["content.js"],
@@ -236,6 +237,7 @@ async function sendToTab(tabId, message) {
 }
 
 function createContextMenu(item) {
+  if (typeof chrome.contextMenus?.create !== "function") return;
   chrome.contextMenus.create(item, () => {
     // Re-registering after reload can briefly race with Edge's persisted menu state.
     void chrome.runtime.lastError;
@@ -243,6 +245,7 @@ function createContextMenu(item) {
 }
 
 function registerContextMenus() {
+  if (typeof chrome.contextMenus?.removeAll !== "function") return;
   chrome.contextMenus.removeAll(() => {
     createContextMenu({
       id: "translate-page",
@@ -268,19 +271,48 @@ function registerContextMenus() {
 }
 
 function updateContextMenu(id, patch) {
+  if (typeof chrome.contextMenus?.update !== "function") return;
   chrome.contextMenus.update(id, patch, () => {
     void chrome.runtime.lastError;
   });
 }
 
-registerContextMenus();
-chrome.runtime.onInstalled.addListener(registerContextMenus);
-chrome.runtime.onStartup.addListener(registerContextMenus);
+function getChromeApi(...path) {
+  try {
+    let value = typeof chrome === "undefined" ? undefined : chrome;
+    for (const key of path) {
+      if (!value) return undefined;
+      value = value[key];
+    }
+    return value;
+  } catch {
+    return undefined;
+  }
+}
 
-chrome.action.onClicked.addListener((tab) => {
-  if (!tab?.id) return;
+function addChromeListener(path, listener) {
+  try {
+    const event = getChromeApi(...path);
+    if (!event) return;
+    const addListener = event.addListener;
+    if (typeof addListener === "function") {
+      addListener.call(event, listener);
+    }
+  } catch {
+    // Some Chromium variants expose partial extension APIs while a service
+    // worker is starting or after a reload. Skip optional listeners there.
+  }
+}
+
+registerContextMenus();
+addChromeListener(["runtime", "onInstalled"], registerContextMenus);
+addChromeListener(["runtime", "onStartup"], registerContextMenus);
+
+addChromeListener(["action", "onClicked"], (tab) => {
+  if (!tab?.id || typeof chrome.tabs?.sendMessage !== "function") return;
   chrome.tabs.sendMessage(tab.id, { type: "translator:toggle" }).catch(async () => {
     try {
+      if (typeof chrome.scripting?.executeScript !== "function") return;
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ["content.js"],
@@ -292,7 +324,7 @@ chrome.action.onClicked.addListener((tab) => {
   });
 });
 
-chrome.contextMenus.onClicked.addListener((info, tab) => {
+addChromeListener(["contextMenus", "onClicked"], (info, tab) => {
   if (info.menuItemId === "translate-page") {
     sendToTab(tab?.id, { type: "translator:start" });
   }
@@ -310,7 +342,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-chrome.contextMenus.onShown.addListener((info) => {
+addChromeListener(["contextMenus", "onShown"], (info) => {
   const hasSelection = Boolean(info.selectionText?.trim());
   updateContextMenu("translate-selection", { visible: hasSelection });
   updateContextMenu("translate-page", { visible: !hasSelection });
@@ -319,7 +351,7 @@ chrome.contextMenus.onShown.addListener((info) => {
   chrome.contextMenus.refresh?.();
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+addChromeListener(["runtime", "onMessage"], (message, _sender, sendResponse) => {
   if (message?.type === "translator:get-settings") {
     getSettings().then((settings) => sendResponse(publicSettings(settings)));
     return true;

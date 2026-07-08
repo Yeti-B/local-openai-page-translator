@@ -71,7 +71,11 @@
 
   function hasExtensionContext() {
     try {
-      return state.extensionContextValid && Boolean(chrome?.runtime?.id);
+      return (
+        state.extensionContextValid &&
+        typeof chrome !== "undefined" &&
+        Boolean(chrome.runtime?.id)
+      );
     } catch {
       return false;
     }
@@ -88,6 +92,18 @@
     detachObservers();
     setStatus("扩展已重新加载，请刷新页面", true);
   }
+
+  window.addEventListener("unhandledrejection", (event) => {
+    if (!isExtensionContextError(event.reason)) return;
+    event.preventDefault();
+    markExtensionContextInvalid();
+  });
+
+  window.addEventListener("error", (event) => {
+    if (!isExtensionContextError(event.error || event.message)) return;
+    event.preventDefault();
+    markExtensionContextInvalid();
+  });
 
   function getIconUrl() {
     try {
@@ -172,6 +188,36 @@
         return null;
       }
       throw error;
+    }
+  }
+
+  function handleAsyncError(error) {
+    if (isExtensionContextError(error)) {
+      markExtensionContextInvalid();
+      return;
+    }
+    setStatus(error?.message || "操作失败", true);
+    console.error(error);
+  }
+
+  function runAsync(task) {
+    Promise.resolve().then(task).catch(handleAsyncError);
+  }
+
+  function addRuntimeMessageListener(listener) {
+    if (!hasExtensionContext()) {
+      markExtensionContextInvalid();
+      return;
+    }
+    try {
+      const event = chrome.runtime && chrome.runtime.onMessage;
+      if (!event) return;
+      const addListener = event.addListener;
+      if (typeof addListener === "function") {
+        addListener.call(event, listener);
+      }
+    } catch (error) {
+      handleAsyncError(error);
     }
   }
 
@@ -1145,7 +1191,7 @@
     language.value = state.settings?.targetLanguage || "Simplified Chinese";
     mode.value = state.settings?.mode || "replace";
 
-    language.addEventListener("change", async () => {
+    language.addEventListener("change", () => runAsync(async () => {
       const settings = await sendMessage({
         type: "translator:save-settings",
         patch: { targetLanguage: language.value },
@@ -1153,8 +1199,8 @@
       if (!settings) return;
       state.settings = settings;
       setStatus("目标语言已更新");
-    });
-    mode.addEventListener("change", async () => {
+    }));
+    mode.addEventListener("change", () => runAsync(async () => {
       const settings = await sendMessage({
         type: "translator:save-settings",
         patch: { mode: mode.value },
@@ -1162,7 +1208,7 @@
       if (!settings) return;
       state.settings = settings;
       setStatus("显示模式已更新");
-    });
+    }));
     state.petButton.addEventListener("pointerdown", handlePetPointerDown);
     state.petButton.addEventListener("click", (event) => {
       if (state.drag?.suppressClick) {
@@ -1171,19 +1217,19 @@
         state.drag.suppressClick = false;
         return;
       }
-      startTranslation();
+      runAsync(startTranslation);
     });
     translate.addEventListener("mousedown", (event) => event.preventDefault());
-    translate.addEventListener("click", async () => {
+    translate.addEventListener("click", () => runAsync(async () => {
       const handledSelection = await translateSelection();
-      if (!handledSelection) startTranslation();
-    });
+      if (!handledSelection) await startTranslation();
+    }));
     pause.addEventListener("click", stopTranslation);
     restore.addEventListener("click", restorePage);
     settings.addEventListener("click", () => {
       void sendMessage({ type: "translator:open-options" });
     });
-    loadPetPosition().then(applyPetPosition);
+    loadPetPosition().then(applyPetPosition).catch(handleAsyncError);
     window.addEventListener("resize", handlePetWindowResize);
   }
 
@@ -1265,16 +1311,19 @@
   attachSelectionButtonListeners();
   createToolbar();
 
-  chrome.runtime.onMessage.addListener((message) => {
+  addRuntimeMessageListener((message) => {
     if (message?.type === "translator:start") {
-      startTranslation();
+      runAsync(startTranslation);
     }
     if (message?.type === "translator:translate-selection") {
-      translateSelection(message.selectedText || "");
+      runAsync(() => translateSelection(message.selectedText || ""));
     }
     if (message?.type === "translator:toggle") {
-      if (state.enabled) stopTranslation();
-      else startTranslation();
+      if (state.enabled) {
+        stopTranslation();
+      } else {
+        runAsync(startTranslation);
+      }
     }
     if (message?.type === "translator:restore") {
       restorePage();
