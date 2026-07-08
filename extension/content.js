@@ -21,6 +21,7 @@
     "SAMP",
   ]);
   const UI_ID = "local-openai-page-translator";
+  const PET_POSITION_KEY = "meepTranslatorPetPosition";
   const MAX_BATCH_ITEMS = 32;
   const MAX_BATCH_CHARS = 4200;
 
@@ -38,14 +39,114 @@
     showingOriginal: false,
     failed: new WeakSet(),
     toolbar: null,
+    dock: null,
     status: null,
+    petButton: null,
+    drag: null,
     mutationObserver: null,
     scrollTimer: 0,
     translatedCount: 0,
+    extensionContextValid: true,
   };
 
-  function sendMessage(message) {
-    return chrome.runtime.sendMessage(message);
+  function isExtensionContextError(error) {
+    return String(error?.message || error).includes("Extension context invalidated");
+  }
+
+  function hasExtensionContext() {
+    try {
+      return state.extensionContextValid && Boolean(chrome?.runtime?.id);
+    } catch {
+      return false;
+    }
+  }
+
+  function markExtensionContextInvalid() {
+    state.extensionContextValid = false;
+    state.enabled = false;
+    state.autoTranslate = false;
+    state.queue = [];
+    window.clearTimeout(state.scrollTimer);
+    detachObservers();
+    setStatus("扩展已重新加载，请刷新页面", true);
+  }
+
+  function getIconUrl() {
+    try {
+      return chrome.runtime.getURL("icons/woodcock-128.png");
+    } catch {
+      return "";
+    }
+  }
+
+  async function loadPetPosition() {
+    if (!hasExtensionContext()) return null;
+    try {
+      const result = await chrome.storage.local.get(PET_POSITION_KEY);
+      const position = result?.[PET_POSITION_KEY];
+      if (
+        position &&
+        Number.isFinite(position.left) &&
+        Number.isFinite(position.top)
+      ) {
+        return position;
+      }
+    } catch (error) {
+      if (isExtensionContextError(error)) markExtensionContextInvalid();
+    }
+    return null;
+  }
+
+  async function savePetPosition(position) {
+    if (!hasExtensionContext()) return;
+    try {
+      await chrome.storage.local.set({ [PET_POSITION_KEY]: position });
+    } catch (error) {
+      if (isExtensionContextError(error)) markExtensionContextInvalid();
+    }
+  }
+
+  function clampPetPosition(left, top) {
+    const dock = state.dock;
+    const width = dock?.offsetWidth || 68;
+    const height = dock?.offsetHeight || 54;
+    const margin = 8;
+    return {
+      left: Math.max(margin, Math.min(left, window.innerWidth - width - margin)),
+      top: Math.max(margin, Math.min(top, window.innerHeight - height - margin)),
+    };
+  }
+
+  function applyPetPosition(position) {
+    if (!state.dock || !position) return;
+    const clamped = clampPetPosition(position.left, position.top);
+    state.dock.style.left = `${clamped.left}px`;
+    state.dock.style.top = `${clamped.top}px`;
+    state.dock.style.right = "auto";
+    state.dock.style.bottom = "auto";
+  }
+
+  function getCurrentPetPosition() {
+    if (!state.dock) return null;
+    const rect = state.dock.getBoundingClientRect();
+    return clampPetPosition(rect.left, rect.top);
+  }
+
+  async function sendMessage(message) {
+    if (!hasExtensionContext()) {
+      markExtensionContextInvalid();
+      return null;
+    }
+
+    try {
+      return await chrome.runtime.sendMessage(message);
+    } catch (error) {
+      if (isExtensionContextError(error)) {
+        markExtensionContextInvalid();
+        return null;
+      }
+      throw error;
+    }
   }
 
   function sleep(ms) {
@@ -196,7 +297,9 @@
           pageUrl: location.href,
         });
 
-        if (!result?.ok) {
+        if (!result) break;
+
+        if (!result.ok) {
           for (const node of nodes) state.failed.add(node);
           setStatus(result?.error || "翻译失败，请检查本地代理。", true);
           await sleep(1200);
@@ -281,7 +384,9 @@
   }
 
   async function ensureSettings() {
-    state.settings = await sendMessage({ type: "translator:get-settings" });
+    const settings = await sendMessage({ type: "translator:get-settings" });
+    if (!settings) return null;
+    state.settings = settings;
     return state.settings;
   }
 
@@ -290,7 +395,8 @@
       enqueueVisibleText();
       return;
     }
-    await ensureSettings();
+    const settings = await ensureSettings();
+    if (!settings) return;
     if (state.showingOriginal) {
       createToolbar();
       const restored = showCachedTranslations();
@@ -369,6 +475,7 @@
     const host = document.createElement("div");
     host.id = UI_ID;
     const shadow = host.attachShadow({ mode: "closed" });
+    const iconUrl = getIconUrl();
     shadow.innerHTML = `
       <style>
         :host {
@@ -376,24 +483,73 @@
           color-scheme: light;
           font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
         }
-        .bar {
+        .dock {
           position: fixed;
           z-index: 2147483647;
-          top: 12px;
-          right: 12px;
+          right: 18px;
+          bottom: 18px;
+          display: flex;
+          flex-direction: row-reverse;
+          align-items: flex-end;
+          gap: 8px;
+          color: #1f2328;
+          font-size: 13px;
+          line-height: 1.35;
+          touch-action: none;
+        }
+        .pet {
+          width: 68px;
+          height: 54px;
+          padding: 0;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+          cursor: pointer;
+          filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.24));
+          transform-origin: 50% 92%;
+          transition: transform 160ms ease, filter 160ms ease;
+        }
+        .pet:hover,
+        .pet:focus-visible {
+          transform: translateY(-2px) rotate(-2deg);
+          filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
+          outline: none;
+        }
+        .pet img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          pointer-events: none;
+          user-select: none;
+        }
+        :host([data-active="true"]) .pet {
+          animation: meep-walk 720ms ease-in-out infinite;
+        }
+        .panel {
+          position: absolute;
+          top: 6px;
+          right: 64px;
           display: flex;
           align-items: center;
           gap: 8px;
           min-height: 38px;
-          max-width: min(820px, calc(100vw - 24px));
+          max-width: min(760px, calc(100vw - 104px));
           padding: 8px 10px;
           border: 1px solid rgba(0, 0, 0, 0.12);
           border-radius: 8px;
           background: rgba(255, 255, 255, 0.96);
           box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
-          color: #1f2328;
-          font-size: 13px;
-          line-height: 1.35;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateX(8px) translateY(4px) scale(0.98);
+          transform-origin: right bottom;
+          transition: opacity 140ms ease, transform 140ms ease;
+        }
+        .dock:hover .panel {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateX(0) translateY(0) scale(1);
         }
         .title {
           font-weight: 600;
@@ -429,11 +585,36 @@
         select {
           padding: 0 24px 0 8px;
         }
+        @keyframes meep-walk {
+          0%, 100% {
+            transform: translateY(0) rotate(-1deg);
+          }
+          50% {
+            transform: translateY(-2px) rotate(1deg);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .pet,
+          .panel,
+          :host([data-active="true"]) .pet {
+            animation: none;
+            transition: none;
+          }
+        }
         @media (max-width: 640px) {
-          .bar {
-            left: 8px;
-            right: 8px;
-            top: 8px;
+          .dock {
+            right: 10px;
+            bottom: 10px;
+            align-items: flex-end;
+          }
+          .pet {
+            width: 60px;
+            height: 48px;
+          }
+          .panel {
+            top: 2px;
+            right: 56px;
+            max-width: calc(100vw - 86px);
             flex-wrap: wrap;
           }
           .status {
@@ -441,30 +622,37 @@
           }
         }
       </style>
-      <div class="bar" role="region" aria-label="meep-translator">
-        <span class="title">meep-translator</span>
-        <span class="status">准备中</span>
-        <select class="language" title="目标语言">
-          <option value="Simplified Chinese">简体中文</option>
-          <option value="Traditional Chinese">繁体中文</option>
-          <option value="English">English</option>
-          <option value="Japanese">日本語</option>
-          <option value="Korean">한국어</option>
-        </select>
-        <select class="mode" title="显示模式">
-          <option value="replace">替换</option>
-          <option value="bilingual">双语</option>
-        </select>
-        <button class="primary translate" type="button">翻译</button>
-        <button class="pause" type="button">暂停</button>
-        <button class="restore" type="button">原文</button>
-        <button class="settings" type="button">设置</button>
+      <div class="dock" role="region" aria-label="meep-translator">
+        <button class="pet" type="button" title="meep-translator" aria-label="开始翻译页面" aria-pressed="false">
+          <img src="${iconUrl}" alt="" />
+        </button>
+        <div class="panel">
+          <span class="title">meep-translator</span>
+          <span class="status">待命</span>
+          <select class="language" title="目标语言">
+            <option value="Simplified Chinese">简体中文</option>
+            <option value="Traditional Chinese">繁体中文</option>
+            <option value="English">English</option>
+            <option value="Japanese">日本語</option>
+            <option value="Korean">한국어</option>
+          </select>
+          <select class="mode" title="显示模式">
+            <option value="replace">替换</option>
+            <option value="bilingual">双语</option>
+          </select>
+          <button class="primary translate" type="button">翻译</button>
+          <button class="pause" type="button">暂停</button>
+          <button class="restore" type="button">原文</button>
+          <button class="settings" type="button">设置</button>
+        </div>
       </div>
     `;
 
     document.documentElement.appendChild(host);
     state.toolbar = host;
+    state.dock = shadow.querySelector(".dock");
     state.status = shadow.querySelector(".status");
+    state.petButton = shadow.querySelector(".pet");
 
     const language = shadow.querySelector(".language");
     const mode = shadow.querySelector(".mode");
@@ -477,32 +665,106 @@
     mode.value = state.settings?.mode || "replace";
 
     language.addEventListener("change", async () => {
-      state.settings = await sendMessage({
+      const settings = await sendMessage({
         type: "translator:save-settings",
         patch: { targetLanguage: language.value },
       });
+      if (!settings) return;
+      state.settings = settings;
       setStatus("目标语言已更新");
     });
     mode.addEventListener("change", async () => {
-      state.settings = await sendMessage({
+      const settings = await sendMessage({
         type: "translator:save-settings",
         patch: { mode: mode.value },
       });
+      if (!settings) return;
+      state.settings = settings;
       setStatus("显示模式已更新");
+    });
+    state.petButton.addEventListener("pointerdown", handlePetPointerDown);
+    state.petButton.addEventListener("click", (event) => {
+      if (state.drag?.suppressClick) {
+        event.preventDefault();
+        event.stopPropagation();
+        state.drag.suppressClick = false;
+        return;
+      }
+      startTranslation();
     });
     translate.addEventListener("click", startTranslation);
     pause.addEventListener("click", stopTranslation);
     restore.addEventListener("click", restorePage);
     settings.addEventListener("click", () => {
-      sendMessage({ type: "translator:open-options" });
+      void sendMessage({ type: "translator:open-options" });
     });
+    loadPetPosition().then(applyPetPosition);
+    window.addEventListener("resize", handlePetWindowResize);
+  }
+
+  function handlePetWindowResize() {
+    const position = getCurrentPetPosition();
+    if (!position) return;
+    applyPetPosition(position);
+    void savePetPosition(position);
+  }
+
+  function handlePetPointerDown(event) {
+    if (event.button !== 0) return;
+    const rect = state.dock.getBoundingClientRect();
+    state.drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      moved: false,
+      suppressClick: false,
+    };
+    state.petButton.setPointerCapture(event.pointerId);
+    state.petButton.addEventListener("pointermove", handlePetPointerMove);
+    state.petButton.addEventListener("pointerup", handlePetPointerUp);
+    state.petButton.addEventListener("pointercancel", handlePetPointerUp);
+  }
+
+  function handlePetPointerMove(event) {
+    const drag = state.drag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    const dx = event.clientX - drag.startX;
+    const dy = event.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true;
+    drag.suppressClick = true;
+    event.preventDefault();
+    applyPetPosition({
+      left: drag.startLeft + dx,
+      top: drag.startTop + dy,
+    });
+  }
+
+  function handlePetPointerUp(event) {
+    const drag = state.drag;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    state.petButton.releasePointerCapture?.(event.pointerId);
+    state.petButton.removeEventListener("pointermove", handlePetPointerMove);
+    state.petButton.removeEventListener("pointerup", handlePetPointerUp);
+    state.petButton.removeEventListener("pointercancel", handlePetPointerUp);
+    if (drag.moved) {
+      const position = getCurrentPetPosition();
+      if (position) void savePetPosition(position);
+    }
   }
 
   function setStatus(text, isError = false) {
     if (!state.status) return;
     state.status.textContent = text;
     state.status.classList.toggle("error", Boolean(isError));
+    state.toolbar?.setAttribute("data-active", String(state.enabled));
+    state.toolbar?.setAttribute("data-busy", String(state.busy));
+    state.petButton?.setAttribute("aria-pressed", String(state.enabled));
   }
+
+  createToolbar();
 
   chrome.runtime.onMessage.addListener((message) => {
     if (message?.type === "translator:start") {
