@@ -1,4 +1,4 @@
-# Local OpenAI Page Translator
+# meep-translator
 
 一个接近 Edge 自带网页翻译体验的浏览器扩展：
 
@@ -49,7 +49,7 @@ API 模式：Chat Completions 兼容
 
 - 打开一个外语网页。
 - 点击浏览器工具栏里的扩展图标，开始翻译。
-- 也可以在页面空白处右键，选择“用 OpenAI 翻译此页”。
+- 也可以在页面空白处右键，选择“用 meep-translator 翻译此页”。
 - 页面右上角会出现翻译条：
   - `翻译`：继续扫描并翻译当前可见内容。
   - `暂停`：停止滚动自动翻译。

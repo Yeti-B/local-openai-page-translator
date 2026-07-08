@@ -232,7 +232,7 @@ async function sendToActiveTab(message) {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "translate-page",
-    title: "用 OpenAI 翻译此页",
+    title: "用 meep-translator 翻译此页",
     contexts: ["page"],
   });
   chrome.contextMenus.create({

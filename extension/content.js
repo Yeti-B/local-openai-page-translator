@@ -441,8 +441,8 @@
           }
         }
       </style>
-      <div class="bar" role="region" aria-label="OpenAI page translator">
-        <span class="title">OpenAI 翻译</span>
+      <div class="bar" role="region" aria-label="meep-translator">
+        <span class="title">meep-translator</span>
         <span class="status">准备中</span>
         <select class="language" title="目标语言">
           <option value="Simplified Chinese">简体中文</option>
