@@ -39,6 +39,7 @@
     partiallyTranslated: new WeakSet(),
     showingOriginal: false,
     failed: new WeakSet(),
+    selectionBusy: false,
     toolbar: null,
     dock: null,
     status: null,
@@ -255,7 +256,7 @@
   }
 
   function enqueueVisibleText(root) {
-    if (!state.enabled || state.busy) return;
+    if (!state.enabled) return;
     for (const node of collectCandidateNodes(root)) {
       const original = state.originalText.get(node) || node.nodeValue || "";
       const cached = getCachedTranslation(node, original);
@@ -266,7 +267,7 @@
       state.queue.push(node);
       state.queued.add(node);
     }
-    if (state.queue.length) processQueue();
+    if (state.queue.length && !state.busy) processQueue();
   }
 
   function buildBatch() {
@@ -433,6 +434,15 @@
     return items;
   }
 
+  function removeNodesFromQueue(nodesToRemove) {
+    if (!nodesToRemove.size || !state.queue.length) return;
+    state.queue = state.queue.filter((node) => {
+      if (!nodesToRemove.has(node)) return true;
+      state.queued.delete(node);
+      return false;
+    });
+  }
+
   function buildSelectionBatches(items) {
     const batches = [];
     let batch = [];
@@ -492,7 +502,7 @@
   async function translateSelection() {
     const items = collectSelectedTextItems();
     if (!items.length) return false;
-    if (state.busy) {
+    if (state.selectionBusy) {
       setStatus("正在翻译，请稍候...");
       return true;
     }
@@ -500,7 +510,11 @@
     const settings = await ensureSettings();
     if (!settings) return true;
     createToolbar();
-    state.busy = true;
+    removeNodesFromQueue(new Set(items.map((item) => item.node)));
+    for (const item of items) {
+      state.failed.delete(item.node);
+    }
+    state.selectionBusy = true;
     updatePetState();
 
     let appliedCount = 0;
@@ -527,8 +541,9 @@
       setStatus(`已翻译选中内容 ${appliedCount} 段`);
       return true;
     } finally {
-      state.busy = false;
+      state.selectionBusy = false;
       updatePetState();
+      if (state.enabled && state.queue.length && !state.busy) processQueue();
     }
   }
 
@@ -983,7 +998,7 @@
   }
 
   function updatePetState() {
-    const isBusy = state.enabled && state.busy;
+    const isBusy = state.busy || state.selectionBusy;
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     state.toolbar?.setAttribute("data-active", String(state.enabled));
     state.toolbar?.setAttribute("data-busy", String(isBusy));
