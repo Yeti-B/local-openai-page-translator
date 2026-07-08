@@ -548,6 +548,8 @@
           display: flex;
           align-items: center;
           gap: 8px;
+          box-sizing: border-box;
+          width: max-content;
           min-height: 38px;
           max-width: min(760px, calc(100vw - 104px));
           padding: 8px 10px;
@@ -567,10 +569,12 @@
           transform: translateX(0) translateY(0) scale(1);
         }
         .title {
+          flex: 0 0 auto;
           font-weight: 600;
           white-space: nowrap;
         }
         .status {
+          flex: 0 1 220px;
           max-width: 240px;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -581,14 +585,18 @@
           color: #b42318;
         }
         button, select {
+          flex: 0 0 auto;
+          box-sizing: border-box;
           min-height: 28px;
           border: 1px solid rgba(0, 0, 0, 0.16);
           border-radius: 6px;
           background: #fff;
           color: #1f2328;
           font: inherit;
+          white-space: nowrap;
         }
         button {
+          min-width: 48px;
           padding: 0 9px;
           cursor: pointer;
         }
@@ -599,6 +607,12 @@
         }
         select {
           padding: 0 24px 0 8px;
+        }
+        .language {
+          min-width: 112px;
+        }
+        .mode {
+          min-width: 76px;
         }
         @media (prefers-reduced-motion: reduce) {
           .pet,
@@ -620,11 +634,23 @@
           .panel {
             top: 2px;
             right: 56px;
+            width: calc(100vw - 86px);
             max-width: calc(100vw - 86px);
             flex-wrap: wrap;
           }
+          .title {
+            flex: 1 1 100%;
+          }
           .status {
-            flex: 1 1 140px;
+            flex: 1 1 100%;
+            max-width: none;
+          }
+          button {
+            flex: 1 1 72px;
+          }
+          select {
+            flex: 1 1 132px;
+            min-width: 0;
           }
         }
       </style>
