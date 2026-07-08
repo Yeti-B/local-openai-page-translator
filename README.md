@@ -55,7 +55,9 @@ API 模式：Chat Completions 兼容
   - `原文`：恢复已经替换过的原文。
   - `设置`：打开 API 配置页。
 
-## 官方 OpenAI 可使用：
+## 翻译建议
+
+官方 OpenAI 可使用：
 
 ```text
 模型：gpt-5.5
