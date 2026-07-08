@@ -498,6 +498,7 @@
           touch-action: none;
         }
         .pet {
+          position: relative;
           width: 68px;
           height: 54px;
           padding: 0;
@@ -515,20 +516,33 @@
           filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
           outline: none;
         }
+        .pet-art {
+          position: absolute;
+          inset: 0;
+          display: block;
+          pointer-events: none;
+          user-select: none;
+        }
         .pet img {
+          position: absolute;
+          inset: 0;
           display: block;
           width: 100%;
           height: 100%;
           object-fit: contain;
           pointer-events: none;
           user-select: none;
-          transform-origin: 48% 78%;
         }
-        :host([data-active="true"]) .pet {
-          animation: meep-skitter 640ms steps(4, end) infinite;
+        .pet-body {
+          clip-path: inset(0 34% 0 0);
+          transform-origin: 46% 78%;
         }
-        :host([data-active="true"]) .pet img {
-          animation: meep-body-wobble 320ms ease-in-out infinite;
+        .pet-head {
+          clip-path: inset(0 0 0 56%);
+          transform-origin: 72% 45%;
+        }
+        :host([data-active="true"]) .pet-body {
+          animation: meep-body-rock 2800ms ease-in-out infinite;
         }
         .panel {
           position: absolute;
@@ -589,36 +603,31 @@
         select {
           padding: 0 24px 0 8px;
         }
-        @keyframes meep-skitter {
-          0% {
-            transform: translateX(0) translateY(0) rotate(-1deg);
+        @keyframes meep-body-rock {
+          0%, 8% {
+            transform: translateX(0) translateY(0) rotate(0deg) scaleX(1) scaleY(1);
           }
-          25% {
-            transform: translateX(2px) translateY(-1px) rotate(1deg);
+          16% {
+            transform: translateX(-3px) translateY(1px) rotate(-2deg) scaleX(1.025) scaleY(0.985);
           }
-          50% {
-            transform: translateX(0) translateY(0) rotate(-1deg);
+          24% {
+            transform: translateX(3px) translateY(-1px) rotate(2deg) scaleX(0.985) scaleY(1.015);
           }
-          75% {
-            transform: translateX(-2px) translateY(-1px) rotate(1deg);
+          32% {
+            transform: translateX(-2px) translateY(1px) rotate(-1.6deg) scaleX(1.02) scaleY(0.99);
           }
-          100% {
-            transform: translateX(0) translateY(0) rotate(-1deg);
+          40% {
+            transform: translateX(2px) translateY(-1px) rotate(1.6deg) scaleX(0.99) scaleY(1.012);
           }
-        }
-        @keyframes meep-body-wobble {
-          0%, 100% {
-            transform: translateX(-2px) rotate(-4deg) scaleX(1.02) scaleY(0.98);
-          }
-          50% {
-            transform: translateX(3px) rotate(4deg) scaleX(0.98) scaleY(1.02);
+          48%, 100% {
+            transform: translateX(0) translateY(0) rotate(0deg) scaleX(1) scaleY(1);
           }
         }
         @media (prefers-reduced-motion: reduce) {
           .pet,
-          .pet img,
+          .pet-body,
           .panel,
-          :host([data-active="true"]) .pet {
+          :host([data-active="true"]) .pet-body {
             animation: none;
             transition: none;
           }
@@ -646,7 +655,10 @@
       </style>
       <div class="dock" role="region" aria-label="meep-translator">
         <button class="pet" type="button" title="meep-translator" aria-label="开始翻译页面" aria-pressed="false">
-          <img src="${iconUrl}" alt="" />
+          <span class="pet-art" aria-hidden="true">
+            <img class="pet-body" src="${iconUrl}" alt="" />
+            <img class="pet-head" src="${iconUrl}" alt="" />
+          </span>
         </button>
         <div class="panel">
           <span class="title">meep-translator</span>
