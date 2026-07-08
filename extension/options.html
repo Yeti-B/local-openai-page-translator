@@ -50,9 +50,23 @@
           </label>
           <label class="field">
             <span>模型</span>
-            <input id="model" type="text" placeholder="gpt-5.5" />
+            <select id="modelPreset">
+              <optgroup label="速度优先">
+                <option value="gpt-5.4-nano">GPT-5.4 nano - 最快</option>
+                <option value="gpt-5.4-mini">GPT-5.4 mini - 快速均衡</option>
+              </optgroup>
+              <optgroup label="质量优先">
+                <option value="gpt-5.4">GPT-5.4 - 高质量</option>
+                <option value="gpt-5.5">GPT-5.5 - 最强质量</option>
+              </optgroup>
+              <option value="custom">自定义模型名</option>
+            </select>
           </label>
         </div>
+        <label class="field" id="customModelField" hidden>
+          <span>自定义模型名</span>
+          <input id="customModel" type="text" placeholder="例如服务商给出的模型名" />
+        </label>
         <div class="grid">
           <label class="field">
             <span>推理强度</span>

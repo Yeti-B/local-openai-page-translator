@@ -29,7 +29,7 @@
 API Key：你的 sk-... key
 Base URL：https://api.openai.com/v1
 API 模式：Responses API
-模型：gpt-5.5
+模型：从下拉菜单选择 GPT-5.5
 ```
 
 OpenAI-compatible 中转示例：
@@ -39,7 +39,7 @@ OpenAI-compatible 中转示例：
 API Key：你的中转 key
 Base URL：https://colabapi.com/v1
 API 模式：Chat Completions 兼容
-模型：中转服务支持的模型名
+模型：先从下拉菜单选择；如果服务商给了特殊模型名，选择“自定义模型名”
 ```
 
 填完后点击“保存设置”，再点“测试连接”。测试成功后就可以翻译网页。
@@ -57,7 +57,17 @@ API 模式：Chat Completions 兼容
 
 ## 翻译建议
 
-官方 OpenAI 可使用：
+官方 OpenAI 模型页建议：复杂任务从 `gpt-5.5` 起步；如果追求低延迟，可选择 `gpt-5.4-mini` 或 `gpt-5.4-nano`。
+
+扩展里提供这些预设：
+
+```text
+速度优先：GPT-5.4 nano、GPT-5.4 mini
+质量优先：GPT-5.4、GPT-5.5
+自定义模型名：用于 ColabAPI、one-api、new-api 等中转服务
+```
+
+论文翻译推荐：
 
 ```text
 模型：gpt-5.5

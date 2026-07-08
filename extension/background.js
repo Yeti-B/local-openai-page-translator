@@ -3,6 +3,7 @@ const DEFAULT_SETTINGS = {
   apiKey: "",
   baseUrl: "https://api.openai.com/v1",
   apiMode: "responses",
+  modelPreset: "gpt-5.5",
   model: "gpt-5.5",
   reasoningEffort: "low",
   textVerbosity: "low",

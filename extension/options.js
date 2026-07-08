@@ -2,7 +2,8 @@ const fields = {
   apiKey: document.querySelector("#apiKey"),
   baseUrl: document.querySelector("#baseUrl"),
   apiMode: document.querySelector("#apiMode"),
-  model: document.querySelector("#model"),
+  modelPreset: document.querySelector("#modelPreset"),
+  customModel: document.querySelector("#customModel"),
   reasoningEffort: document.querySelector("#reasoningEffort"),
   textVerbosity: document.querySelector("#textVerbosity"),
   endpoint: document.querySelector("#endpoint"),
@@ -12,7 +13,9 @@ const fields = {
 
 const directPanel = document.querySelector("#directPanel");
 const proxyPanel = document.querySelector("#proxyPanel");
+const customModelField = document.querySelector("#customModelField");
 const statusEl = document.querySelector("#status");
+const MODEL_PRESETS = new Set(["gpt-5.4-nano", "gpt-5.4-mini", "gpt-5.4", "gpt-5.5"]);
 
 function setStatus(text, type = "") {
   statusEl.textContent = text;
@@ -30,21 +33,45 @@ function setProviderMode(value) {
   proxyPanel.hidden = value !== "proxy";
 }
 
+function updateCustomModelVisibility() {
+  customModelField.hidden = fields.modelPreset.value !== "custom";
+}
+
 async function loadSettings() {
   const settings = await chrome.runtime.sendMessage({ type: "translator:get-settings" });
   setProviderMode(settings.providerMode || "direct");
-  for (const [key, field] of Object.entries(fields)) {
-    if (settings[key] !== undefined) field.value = settings[key];
+  fields.apiKey.value = settings.apiKey || "";
+  fields.baseUrl.value = settings.baseUrl || "";
+  fields.apiMode.value = settings.apiMode || "responses";
+  fields.reasoningEffort.value = settings.reasoningEffort || "low";
+  fields.textVerbosity.value = settings.textVerbosity || "low";
+  fields.endpoint.value = settings.endpoint || "";
+  fields.targetLanguage.value = settings.targetLanguage || "Simplified Chinese";
+  fields.mode.value = settings.mode || "replace";
+
+  const storedModel = settings.model || "gpt-5.5";
+  if (MODEL_PRESETS.has(storedModel)) {
+    fields.modelPreset.value = storedModel;
+    fields.customModel.value = "";
+  } else {
+    fields.modelPreset.value = "custom";
+    fields.customModel.value = storedModel;
   }
+  updateCustomModelVisibility();
 }
 
 function readSettings() {
+  const selectedModel =
+    fields.modelPreset.value === "custom"
+      ? fields.customModel.value.trim()
+      : fields.modelPreset.value;
   return {
     providerMode: providerMode(),
     apiKey: fields.apiKey.value.trim(),
     baseUrl: fields.baseUrl.value.trim(),
     apiMode: fields.apiMode.value,
-    model: fields.model.value.trim(),
+    modelPreset: fields.modelPreset.value,
+    model: selectedModel,
     reasoningEffort: fields.reasoningEffort.value,
     textVerbosity: fields.textVerbosity.value,
     endpoint: fields.endpoint.value.trim(),
@@ -81,6 +108,8 @@ fields.baseUrl.addEventListener("change", () => {
     fields.apiMode.value = "chat";
   }
 });
+
+fields.modelPreset.addEventListener("change", updateCustomModelVisibility);
 
 document.querySelector("#save").addEventListener("click", saveSettings);
 document.querySelector("#saveTop").addEventListener("click", saveSettings);
