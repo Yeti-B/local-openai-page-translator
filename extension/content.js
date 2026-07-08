@@ -313,6 +313,7 @@
       }
     } finally {
       state.busy = false;
+      updatePetState();
       if (state.enabled && state.autoTranslate) scheduleScan(300);
     }
   }
@@ -541,7 +542,7 @@
           clip-path: inset(0 0 0 56%);
           transform-origin: 72% 45%;
         }
-        :host([data-active="true"]) .pet-body {
+        :host([data-busy="true"]) .pet-body {
           animation: meep-body-rock 2800ms ease-in-out infinite;
         }
         .panel {
@@ -627,7 +628,7 @@
           .pet,
           .pet-body,
           .panel,
-          :host([data-active="true"]) .pet-body {
+          :host([data-busy="true"]) .pet-body {
             animation: none;
             transition: none;
           }
@@ -790,11 +791,16 @@
   }
 
   function setStatus(text, isError = false) {
-    if (!state.status) return;
-    state.status.textContent = text;
-    state.status.classList.toggle("error", Boolean(isError));
+    if (state.status) {
+      state.status.textContent = text;
+      state.status.classList.toggle("error", Boolean(isError));
+    }
+    updatePetState();
+  }
+
+  function updatePetState() {
     state.toolbar?.setAttribute("data-active", String(state.enabled));
-    state.toolbar?.setAttribute("data-busy", String(state.busy));
+    state.toolbar?.setAttribute("data-busy", String(state.enabled && state.busy));
     state.petButton?.setAttribute("aria-pressed", String(state.enabled));
   }
 
