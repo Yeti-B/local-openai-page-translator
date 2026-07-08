@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenAI Page Translator Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <div>
+          <h1>OpenAI 网页翻译设置</h1>
+          <p>填入自己的 API Key 和 Base URL 后，扩展即可直接翻译网页。</p>
+        </div>
+        <button id="saveTop" class="primary" type="button">保存</button>
+      </header>
+
+      <section class="panel">
+        <h2>连接方式</h2>
+        <div class="segmented" role="radiogroup" aria-label="连接方式">
+          <label>
+            <input type="radio" name="providerMode" value="direct" />
+            <span>直连 API</span>
+          </label>
+          <label>
+            <input type="radio" name="providerMode" value="proxy" />
+            <span>本地代理</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel" id="directPanel">
+        <h2>API 配置</h2>
+        <label class="field">
+          <span>API Key</span>
+          <input id="apiKey" type="password" autocomplete="off" placeholder="sk-..." />
+        </label>
+        <label class="field">
+          <span>Base URL</span>
+          <input id="baseUrl" type="url" placeholder="https://api.openai.com/v1" />
+        </label>
+        <div class="grid">
+          <label class="field">
+            <span>API 模式</span>
+            <select id="apiMode">
+              <option value="responses">Responses API</option>
+              <option value="chat">Chat Completions 兼容</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>模型</span>
+            <input id="model" type="text" placeholder="gpt-5.5" />
+          </label>
+        </div>
+        <div class="grid">
+          <label class="field">
+            <span>推理强度</span>
+            <select id="reasoningEffort">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>输出长度</span>
+            <select id="textVerbosity">
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </label>
+        </div>
+        <p class="note">
+          使用 ColabAPI、one-api、new-api 等中转时，通常填中转地址并选择“Chat Completions 兼容”。
+        </p>
+      </section>
+
+      <section class="panel" id="proxyPanel">
+        <h2>本地代理</h2>
+        <label class="field">
+          <span>代理地址</span>
+          <input id="endpoint" type="url" placeholder="http://127.0.0.1:8787" />
+        </label>
+        <p class="note">只有需要把 API Key 留在本机 Node 服务里时才使用这一项。</p>
+      </section>
+
+      <section class="panel">
+        <h2>翻译偏好</h2>
+        <div class="grid">
+          <label class="field">
+            <span>目标语言</span>
+            <select id="targetLanguage">
+              <option value="Simplified Chinese">简体中文</option>
+              <option value="Traditional Chinese">繁体中文</option>
+              <option value="English">English</option>
+              <option value="Japanese">日本語</option>
+              <option value="Korean">한국어</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>显示模式</span>
+            <select id="mode">
+              <option value="replace">替换原文</option>
+              <option value="bilingual">双语显示</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <footer class="actions">
+        <button id="save" class="primary" type="button">保存设置</button>
+        <button id="test" type="button">测试连接</button>
+        <span id="status" role="status"></span>
+      </footer>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

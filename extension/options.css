@@ -1,0 +1,179 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f5f7fb;
+  color: #1f2328;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  width: min(920px, calc(100vw - 32px));
+  margin: 32px auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+h2 {
+  margin-bottom: 14px;
+  font-size: 17px;
+}
+
+.header p,
+.note {
+  margin-top: 8px;
+  color: #59636e;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.panel {
+  margin: 14px 0;
+  padding: 18px;
+  border: 1px solid #d7dde7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.segmented {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #cfd7e3;
+  border-radius: 8px;
+  background: #eef2f7;
+}
+
+.segmented label {
+  display: block;
+}
+
+.segmented input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segmented span {
+  display: block;
+  padding: 8px 14px;
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.segmented input:checked + span {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(31, 35, 40, 0.14);
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.field span {
+  color: #384250;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  min-height: 40px;
+  border: 1px solid #cfd7e3;
+  border-radius: 7px;
+  font: inherit;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 0 12px;
+  background: #fff;
+  color: #1f2328;
+}
+
+button {
+  padding: 0 16px;
+  background: #fff;
+  color: #1f2328;
+  cursor: pointer;
+}
+
+button.primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+#status {
+  color: #59636e;
+  font-size: 14px;
+}
+
+#status.ok {
+  color: #067647;
+}
+
+#status.error {
+  color: #b42318;
+}
+
+@media (max-width: 680px) {
+  .header,
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .segmented {
+    width: 100%;
+  }
+}

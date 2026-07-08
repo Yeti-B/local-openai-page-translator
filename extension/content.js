@@ -304,7 +304,7 @@
           align-items: center;
           gap: 8px;
           min-height: 38px;
-          max-width: min(720px, calc(100vw - 24px));
+          max-width: min(820px, calc(100vw - 24px));
           padding: 8px 10px;
           border: 1px solid rgba(0, 0, 0, 0.12);
           border-radius: 8px;
@@ -377,6 +377,7 @@
         <button class="primary translate" type="button">翻译</button>
         <button class="pause" type="button">暂停</button>
         <button class="restore" type="button">原文</button>
+        <button class="settings" type="button">设置</button>
       </div>
     `;
 
@@ -389,6 +390,7 @@
     const translate = shadow.querySelector(".translate");
     const pause = shadow.querySelector(".pause");
     const restore = shadow.querySelector(".restore");
+    const settings = shadow.querySelector(".settings");
 
     language.value = state.settings?.targetLanguage || "Simplified Chinese";
     mode.value = state.settings?.mode || "replace";
@@ -410,6 +412,9 @@
     translate.addEventListener("click", startTranslation);
     pause.addEventListener("click", stopTranslation);
     restore.addEventListener("click", restorePage);
+    settings.addEventListener("click", () => {
+      sendMessage({ type: "translator:open-options" });
+    });
   }
 
   function setStatus(text, isError = false) {
