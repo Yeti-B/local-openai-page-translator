@@ -32,7 +32,10 @@
     queue: [],
     queued: new WeakSet(),
     originalText: new WeakMap(),
+    translationByNode: new WeakMap(),
+    translationCache: new Map(),
     translated: new WeakSet(),
+    showingOriginal: false,
     failed: new WeakSet(),
     toolbar: null,
     status: null,
@@ -64,6 +67,28 @@
 
   function normalizeText(text) {
     return text.replace(/\s+/g, " ").trim();
+  }
+
+  function cacheKeyForText(text) {
+    return [
+      state.settings?.targetLanguage || "Simplified Chinese",
+      state.settings?.sourceLanguage || "auto",
+      normalizeText(text),
+    ].join("\n---\n");
+  }
+
+  function renderTranslation(original, translation) {
+    if (state.settings?.mode === "bilingual") {
+      return `${original}\n${translation}`;
+    }
+    return translation;
+  }
+
+  function getCachedTranslation(node, original) {
+    const key = cacheKeyForText(original);
+    const nodeCache = state.translationByNode.get(node);
+    if (nodeCache?.key === key) return nodeCache.text;
+    return state.translationCache.get(key);
   }
 
   function shouldTranslateNode(node) {
@@ -114,6 +139,12 @@
   function enqueueVisibleText(root) {
     if (!state.enabled || state.busy) return;
     for (const node of collectCandidateNodes(root)) {
+      const original = state.originalText.get(node) || node.nodeValue || "";
+      const cached = getCachedTranslation(node, original);
+      if (cached) {
+        applyCachedTranslation(node, cached);
+        continue;
+      }
       state.queue.push(node);
       state.queued.add(node);
     }
@@ -127,7 +158,13 @@
 
     while (state.queue.length && nodes.length < MAX_BATCH_ITEMS) {
       const node = state.queue.shift();
-      const text = normalizeText(node.nodeValue || "");
+      const original = state.originalText.get(node) || node.nodeValue || "";
+      const cached = getCachedTranslation(node, original);
+      if (cached) {
+        applyCachedTranslation(node, cached);
+        continue;
+      }
+      const text = normalizeText(original);
       if (!text || state.translated.has(node) || state.failed.has(node) || isSkippableNode(node)) {
         continue;
       }
@@ -188,13 +225,28 @@
         state.originalText.set(node, node.nodeValue);
       }
 
-      if (state.settings?.mode === "bilingual") {
-        node.nodeValue = `${state.originalText.get(node)}\n${translatedText}`;
-      } else {
-        node.nodeValue = translatedText;
-      }
+      const original = state.originalText.get(node);
+      const cacheKey = cacheKeyForText(original);
+      state.translationByNode.set(node, { key: cacheKey, text: translatedText });
+      state.translationCache.set(cacheKey, translatedText);
+      node.nodeValue = renderTranslation(original, translatedText);
       state.translated.add(node);
     });
+    state.showingOriginal = false;
+  }
+
+  function applyCachedTranslation(node, translatedText) {
+    if (!translatedText || !node.parentNode) return false;
+    const original = state.originalText.get(node) || node.nodeValue;
+    if (!state.originalText.has(node)) {
+      state.originalText.set(node, original);
+    }
+    state.translationByNode.set(node, { key: cacheKeyForText(original), text: translatedText });
+    node.nodeValue = renderTranslation(original, translatedText);
+    state.translated.add(node);
+    state.failed.delete?.(node);
+    state.showingOriginal = false;
+    return true;
   }
 
   function restoreOriginals(root = document.body) {
@@ -206,8 +258,26 @@
       const original = state.originalText.get(node);
       if (original !== undefined) {
         node.nodeValue = original;
+        state.translated.delete?.(node);
       }
     }
+    state.showingOriginal = true;
+  }
+
+  function showCachedTranslations(root = document.body) {
+    if (!root) return 0;
+    let count = 0;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (true) {
+      const node = walker.nextNode();
+      if (!node) break;
+      const original = state.originalText.get(node) || node.nodeValue;
+      const cached = getCachedTranslation(node, original);
+      if (cached && applyCachedTranslation(node, cached)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   async function ensureSettings() {
@@ -221,6 +291,18 @@
       return;
     }
     await ensureSettings();
+    if (state.showingOriginal) {
+      createToolbar();
+      const restored = showCachedTranslations();
+      if (restored) {
+        setStatus(`已显示缓存译文 ${restored} 段`);
+        state.enabled = true;
+        state.autoTranslate = true;
+        attachObservers();
+        scheduleScan(200);
+        return;
+      }
+    }
     state.enabled = true;
     state.autoTranslate = true;
     state.translatedCount = 0;
@@ -242,8 +324,7 @@
   function restorePage() {
     stopTranslation();
     restoreOriginals();
-    state.translatedCount = 0;
-    setStatus("已恢复原文");
+    setStatus("已恢复原文，译文已缓存");
   }
 
   function attachObservers() {
